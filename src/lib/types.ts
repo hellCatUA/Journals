@@ -13,6 +13,7 @@ export interface Category {
   write_off: WriteOffPolicy;
   default_write_off_pct: number;
   color: string;
+  icon: string; // Lucide icon name, '' = none
   archived: 0 | 1;
 }
 
@@ -44,6 +45,7 @@ export interface Expense {
 export interface ExpenseRow extends Expense {
   category_name: string | null;
   category_color: string | null;
+  category_icon: string | null;
   category_write_off: WriteOffPolicy | null;
   account_name: string | null;
   group_ids: number[];

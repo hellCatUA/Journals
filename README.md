@@ -6,9 +6,15 @@ mark write-offs, group by project and export to CSV.
 
 ## Features
 
-- **Receipt upload** — photo from phone camera, drag & drop, or PDF
+- **Receipt upload** — phone camera or gallery (separate buttons), drag &
+  drop, or PDF
 - **Local OCR** — Tesseract runs inside the container (no cloud, no API keys);
-  detects amount, date, time and vendor, everything editable before saving
+  several preprocessing variants and page-segmentation modes are tried and
+  the highest-confidence read wins; detects amount, date, time and vendor,
+  everything editable before saving
+- **Category icons** — monochrome Lucide icon set (~2000 icons) with a
+  searchable picker in Settings; icons are tinted with the category color
+  and shown on the expense list
 - **Expense fields** — amount (USD), date & time, category, account,
   write-off flag with percentage, vendor, note
 - **Write-off policies per category** — full, partial-only (e.g. Meals 50%,

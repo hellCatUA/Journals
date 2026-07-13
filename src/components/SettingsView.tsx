@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Account, Category, WriteOffPolicy } from '@/lib/types';
+import IconPicker from './IconPicker';
 
 export default function SettingsView() {
   return (
@@ -129,6 +130,7 @@ function CategoriesSection() {
   const [policy, setPolicy] = useState<WriteOffPolicy>('full');
   const [pct, setPct] = useState('50');
   const [color, setColor] = useState('#0ea5e9');
+  const [icon, setIcon] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -145,13 +147,14 @@ function CategoriesSection() {
     const res = await fetch('/api/categories', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, write_off: policy, default_write_off_pct: Number(pct), color }),
+      body: JSON.stringify({ name, write_off: policy, default_write_off_pct: Number(pct), color, icon }),
     });
     if (!res.ok) {
       setError((await res.json()).error ?? 'Failed.');
       return;
     }
     setName('');
+    setIcon('');
     load();
   }
 
@@ -183,7 +186,8 @@ function CategoriesSection() {
         </p>
       </div>
 
-      <form onSubmit={add} className="card grid grid-cols-2 gap-2 p-3 sm:grid-cols-[2fr_1fr_5rem_3rem_auto]">
+      <form onSubmit={add} className="card grid grid-cols-2 gap-2 p-3 sm:grid-cols-[auto_2fr_1fr_5rem_3rem_auto]">
+        <IconPicker value={icon} color={color} onChange={setIcon} />
         <input className="input" placeholder="Category name" value={name} onChange={(e) => setName(e.target.value)} required />
         <select className="input" value={policy} onChange={(e) => setPolicy(e.target.value as WriteOffPolicy)}>
           {POLICIES.map((p) => (
@@ -207,7 +211,16 @@ function CategoriesSection() {
       <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
         {categories.map((c) => (
           <div key={c.id} className={`flex flex-wrap items-center gap-2 p-3 sm:flex-nowrap ${c.archived ? 'opacity-50' : ''}`}>
-            <span className="h-3 w-3 flex-none rounded-full" style={{ backgroundColor: c.color }} />
+            <IconPicker value={c.icon} color={c.color} onChange={(icon) => update(c, { icon })} />
+            <input
+              type="color"
+              className="h-6 w-6 flex-none cursor-pointer rounded border border-zinc-300 bg-transparent dark:border-zinc-700"
+              defaultValue={c.color}
+              title="Category color"
+              onBlur={(e) => {
+                if (e.target.value !== c.color) update(c, { color: e.target.value });
+              }}
+            />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">{c.name}</span>
 
             <select

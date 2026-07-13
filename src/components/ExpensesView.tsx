@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Account, Category, ExpenseRow, ExpenseStats, Group } from '@/lib/types';
 import { writeOffCents } from '@/lib/types';
 import { MONTH_NAMES, formatDateShort, formatMoney, monthRange } from '@/lib/format';
+import CategoryIcon from './CategoryIcon';
 
 type Period = { year: number; month: number } | 'all';
 
@@ -180,23 +181,21 @@ function ExpenseRowItem({ expense: e }: { expense: ExpenseRow }) {
       href={`/expenses/${e.id}`}
       className="flex items-center gap-3 p-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
     >
-      {/* Receipt thumbnail or category dot */}
-      {e.receipt_path && !e.receipt_path.endsWith('.pdf') ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/receipts/${e.receipt_path}`}
-          alt=""
-          loading="lazy"
-          className="h-12 w-12 flex-none rounded-lg border border-zinc-200 object-cover dark:border-zinc-700"
-        />
-      ) : (
-        <span
-          className="flex h-12 w-12 flex-none items-center justify-center rounded-lg text-lg"
-          style={{ backgroundColor: `${e.category_color ?? '#71717a'}22`, color: e.category_color ?? '#71717a' }}
-        >
-          {e.receipt_path ? '📄' : '🧾'}
-        </span>
-      )}
+      {/* Category icon tinted with the category color */}
+      <span
+        className="relative flex h-11 w-11 flex-none items-center justify-center rounded-full"
+        style={{ backgroundColor: `${e.category_color ?? '#71717a'}1f` }}
+      >
+        <CategoryIcon icon={e.category_icon} color={e.category_color ?? '#71717a'} size={20} />
+        {e.receipt_path && (
+          <span
+            title="Receipt attached"
+            className="absolute -right-0.5 -bottom-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <CategoryIcon icon="paperclip" color="currentColor" size={9} className="text-zinc-500 dark:text-zinc-400" />
+          </span>
+        )}
+      </span>
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">

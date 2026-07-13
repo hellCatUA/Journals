@@ -25,3 +25,6 @@ next-env.d.ts
 
 # app data (receipts + sqlite db)
 /data/
+
+# generated icon set (copied from lucide-static by scripts/copy-icons.mjs)
+/public/icons/

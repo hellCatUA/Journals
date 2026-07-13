@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS categories (
   write_off TEXT NOT NULL DEFAULT 'full' CHECK (write_off IN ('full', 'partial', 'none')),
   default_write_off_pct INTEGER NOT NULL DEFAULT 100 CHECK (default_write_off_pct BETWEEN 0 AND 100),
   color TEXT NOT NULL DEFAULT '#71717a',
+  icon TEXT NOT NULL DEFAULT '',
   archived INTEGER NOT NULL DEFAULT 0
 );
 
@@ -61,28 +62,29 @@ CREATE INDEX IF NOT EXISTS idx_expense_groups_group ON expense_groups(group_id);
 `;
 
 // Categories tailored to a field IT services business.
-const SEED_CATEGORIES: Array<[string, 'full' | 'partial' | 'none', number, string]> = [
-  ['Tools & Equipment', 'full', 100, '#0ea5e9'],
-  ['Computer Hardware & Parts', 'full', 100, '#6366f1'],
-  ['Cables & Consumables', 'full', 100, '#8b5cf6'],
-  ['Software & Licenses', 'full', 100, '#a855f7'],
-  ['Fuel', 'partial', 80, '#f59e0b'],
-  ['Vehicle Maintenance & Repairs', 'partial', 80, '#d97706'],
-  ['Parking & Tolls', 'full', 100, '#eab308'],
-  ['Travel & Lodging', 'full', 100, '#14b8a6'],
-  ['Meals & Client Entertainment', 'partial', 50, '#f43f5e'],
-  ['Mobile & Internet', 'partial', 50, '#06b6d4'],
-  ['Office Supplies', 'full', 100, '#84cc16'],
-  ['Shipping & Postage', 'full', 100, '#10b981'],
-  ['Training & Certifications', 'full', 100, '#3b82f6'],
-  ['Subcontractors', 'full', 100, '#ec4899'],
-  ['Marketing & Advertising', 'full', 100, '#f97316'],
-  ['Insurance', 'full', 100, '#64748b'],
-  ['Safety Gear & Uniforms', 'full', 100, '#22c55e'],
-  ['Bank & Payment Fees', 'full', 100, '#94a3b8'],
-  ['Workspace / Home Office', 'partial', 30, '#78716c'],
-  ['Personal / Non-deductible', 'none', 0, '#71717a'],
-  ['Miscellaneous', 'full', 100, '#a1a1aa'],
+// Icon names come from the Lucide set (public/icons).
+const SEED_CATEGORIES: Array<[string, 'full' | 'partial' | 'none', number, string, string]> = [
+  ['Tools & Equipment', 'full', 100, '#0ea5e9', 'wrench'],
+  ['Computer Hardware & Parts', 'full', 100, '#6366f1', 'cpu'],
+  ['Cables & Consumables', 'full', 100, '#8b5cf6', 'cable'],
+  ['Software & Licenses', 'full', 100, '#a855f7', 'app-window'],
+  ['Fuel', 'partial', 80, '#f59e0b', 'fuel'],
+  ['Vehicle Maintenance & Repairs', 'partial', 80, '#d97706', 'car'],
+  ['Parking & Tolls', 'full', 100, '#eab308', 'square-parking'],
+  ['Travel & Lodging', 'full', 100, '#14b8a6', 'plane'],
+  ['Meals & Client Entertainment', 'partial', 50, '#f43f5e', 'utensils'],
+  ['Mobile & Internet', 'partial', 50, '#06b6d4', 'smartphone'],
+  ['Office Supplies', 'full', 100, '#84cc16', 'paperclip'],
+  ['Shipping & Postage', 'full', 100, '#10b981', 'package'],
+  ['Training & Certifications', 'full', 100, '#3b82f6', 'graduation-cap'],
+  ['Subcontractors', 'full', 100, '#ec4899', 'users'],
+  ['Marketing & Advertising', 'full', 100, '#f97316', 'megaphone'],
+  ['Insurance', 'full', 100, '#64748b', 'shield-check'],
+  ['Safety Gear & Uniforms', 'full', 100, '#22c55e', 'hard-hat'],
+  ['Bank & Payment Fees', 'full', 100, '#94a3b8', 'landmark'],
+  ['Workspace / Home Office', 'partial', 30, '#78716c', 'house'],
+  ['Personal / Non-deductible', 'none', 0, '#71717a', 'user'],
+  ['Miscellaneous', 'full', 100, '#a1a1aa', 'shapes'],
 ];
 
 const SEED_ACCOUNTS: Array<[string, string]> = [
@@ -100,13 +102,18 @@ function createDb(): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate(db);
 
   const categoryCount = (db.prepare('SELECT COUNT(*) AS n FROM categories').get() as { n: number }).n;
   if (categoryCount === 0) {
     const ins = db.prepare(
-      'INSERT INTO categories (name, write_off, default_write_off_pct, color) VALUES (?, ?, ?, ?)'
+      'INSERT INTO categories (name, write_off, default_write_off_pct, color, icon) VALUES (?, ?, ?, ?, ?)'
     );
     for (const row of SEED_CATEGORIES) ins.run(...row);
+  } else {
+    // Backfill icons for seeded categories on databases created before the icon column existed.
+    const fill = db.prepare("UPDATE categories SET icon = ? WHERE name = ? AND icon = ''");
+    for (const [name, , , , icon] of SEED_CATEGORIES) fill.run(icon, name);
   }
 
   const accountCount = (db.prepare('SELECT COUNT(*) AS n FROM accounts').get() as { n: number }).n;
@@ -116,6 +123,14 @@ function createDb(): Database.Database {
   }
 
   return db;
+}
+
+/** Additive schema upgrades for databases created by older versions. */
+function migrate(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(categories)').all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === 'icon')) {
+    db.exec("ALTER TABLE categories ADD COLUMN icon TEXT NOT NULL DEFAULT ''");
+  }
 }
 
 // Reuse the connection across Next.js dev-mode module reloads.

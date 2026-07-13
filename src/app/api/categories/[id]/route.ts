@@ -21,11 +21,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     write_off === 'none' ? 0 : write_off === 'full' ? 100 : clamp(body?.default_write_off_pct, existing.default_write_off_pct);
   const color = /^#[0-9a-fA-F]{6}$/.test(String(body?.color ?? '')) ? body.color : existing.color;
   const archived = body?.archived === undefined ? existing.archived : body.archived ? 1 : 0;
+  let icon = existing.icon;
+  if (body?.icon !== undefined) {
+    const s = String(body.icon ?? '').trim();
+    icon = /^[a-z0-9-]{1,60}$/.test(s) ? s : '';
+  }
 
   try {
     db.prepare(
-      'UPDATE categories SET name = ?, write_off = ?, default_write_off_pct = ?, color = ?, archived = ? WHERE id = ?'
-    ).run(name, write_off, pct, color, archived, id);
+      'UPDATE categories SET name = ?, write_off = ?, default_write_off_pct = ?, color = ?, icon = ?, archived = ? WHERE id = ?'
+    ).run(name, write_off, pct, color, icon, archived, id);
   } catch {
     return NextResponse.json({ error: 'A category with this name already exists.' }, { status: 409 });
   }

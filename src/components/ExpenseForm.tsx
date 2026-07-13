@@ -32,7 +32,10 @@ export default function ExpenseForm({ expense }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [removeReceipt, setRemoveReceipt] = useState(false);
+  // Two inputs: a plain one (gallery / file browser) and one with
+  // capture="environment" that jumps straight into the camera on phones.
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
@@ -218,7 +221,7 @@ export default function ExpenseForm({ expense }: Props) {
                 <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" strokeLinecap="round" />
               </svg>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Tap to take a photo or drop an image here
+                Tap to choose a photo or drop an image here
               </p>
               <p className="text-xs text-zinc-400 dark:text-zinc-500">JPG, PNG, WebP, HEIC or PDF · max 25 MB</p>
             </>
@@ -229,12 +232,25 @@ export default function ExpenseForm({ expense }: Props) {
           ref={fileInputRef}
           type="file"
           accept="image/*,.pdf"
+          className="hidden"
+          onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+        />
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
           capture="environment"
           className="hidden"
           onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
         />
 
         <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-secondary" onClick={() => cameraInputRef.current?.click()}>
+            📷 Camera
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+            🖼 Gallery
+          </button>
           <button
             type="button"
             className="btn-primary"
@@ -251,6 +267,7 @@ export default function ExpenseForm({ expense }: Props) {
                 onPickFile(null);
                 if (isEdit && expense!.receipt_path) setRemoveReceipt(true);
                 if (fileInputRef.current) fileInputRef.current.value = '';
+                if (cameraInputRef.current) cameraInputRef.current.value = '';
               }}
             >
               Remove photo

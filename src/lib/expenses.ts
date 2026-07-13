@@ -53,7 +53,7 @@ export function listExpenses(filters: ExpenseFilters): { expenses: ExpenseRow[];
   const rows = db
     .prepare(
       `SELECT e.*,
-              c.name AS category_name, c.color AS category_color, c.write_off AS category_write_off,
+              c.name AS category_name, c.color AS category_color, c.icon AS category_icon, c.write_off AS category_write_off,
               a.name AS account_name
        FROM expenses e
        LEFT JOIN categories c ON c.id = e.category_id
@@ -86,7 +86,7 @@ export function getExpense(id: number): ExpenseRow | null {
   const row = db
     .prepare(
       `SELECT e.*,
-              c.name AS category_name, c.color AS category_color, c.write_off AS category_write_off,
+              c.name AS category_name, c.color AS category_color, c.icon AS category_icon, c.write_off AS category_write_off,
               a.name AS account_name
        FROM expenses e
        LEFT JOIN categories c ON c.id = e.category_id

@@ -4,12 +4,15 @@
   "private": true,
   "description": "Self-hosted business expense tracker with receipt OCR for field IT services",
   "scripts": {
+    "predev": "node scripts/copy-icons.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-icons.mjs",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
+    "lucide-static": "^1.24.0",
     "next": "^15.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
