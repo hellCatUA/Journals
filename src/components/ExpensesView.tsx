@@ -5,8 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Account, Category, ExpenseRow, ExpenseStats, Group } from '@/lib/types';
 import { writeOffCents } from '@/lib/types';
-import { MONTH_NAMES, formatDateShort, formatMoney, monthRange } from '@/lib/format';
+import { MONTH_NAMES, dayLabel, formatMoney, mondayOf, monthRange, todayISO, weekLabel } from '@/lib/format';
 import CategoryIcon from './CategoryIcon';
+
+interface DayGroup {
+  date: string;
+  items: ExpenseRow[];
+  totalCents: number;
+}
 
 type Period = { year: number; month: number } | 'all';
 
@@ -82,6 +88,40 @@ export default function ExpensesView() {
     });
   }
 
+  // Expenses arrive sorted by occurred_at DESC, so grouping preserves order.
+  const dayGroups = useMemo<DayGroup[]>(() => {
+    const map = new Map<string, DayGroup>();
+    for (const e of expenses) {
+      const date = e.occurred_at.split(' ')[0];
+      let g = map.get(date);
+      if (!g) {
+        g = { date, items: [], totalCents: 0 };
+        map.set(date, g);
+      }
+      g.items.push(e);
+      g.totalCents += e.amount_cents;
+    }
+    return [...map.values()];
+  }, [expenses]);
+
+  const weekTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const g of dayGroups) {
+      const key = mondayOf(g.date);
+      totals.set(key, (totals.get(key) ?? 0) + g.totalCents);
+    }
+    return totals;
+  }, [dayGroups]);
+
+  const monthTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const g of dayGroups) {
+      const key = g.date.slice(0, 7);
+      totals.set(key, (totals.get(key) ?? 0) + g.totalCents);
+    }
+    return totals;
+  }, [dayGroups]);
+
   return (
     <div className="flex flex-col gap-4">
       {/* Period switcher */}
@@ -146,18 +186,74 @@ export default function ExpensesView() {
 
       {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {/* List */}
-      <div className="card divide-y divide-zinc-100 dark:divide-zinc-800">
-        {loading && expenses.length === 0 ? (
+      {/* List grouped by day, with week and month separators */}
+      {loading && expenses.length === 0 ? (
+        <div className="card">
           <p className="p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
-        ) : expenses.length === 0 ? (
-          <div className="p-10 text-center">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">No expenses for this period.</p>
-            <Link href="/add" className="btn-primary mt-4">Add your first expense</Link>
-          </div>
-        ) : (
-          expenses.map((e) => <ExpenseRowItem key={e.id} expense={e} />)
-        )}
+        </div>
+      ) : expenses.length === 0 ? (
+        <div className="card p-10 text-center">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">No expenses for this period.</p>
+          <Link href="/add" className="btn-primary mt-4">Add your first expense</Link>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {dayGroups.map((g, i) => {
+            const prev = dayGroups[i - 1];
+            const monthKey = g.date.slice(0, 7);
+            // Month headers only make sense when several months can be on
+            // screen (the "All time" view); in month view the switcher
+            // already names the month.
+            const showMonth = period === 'all' && (!prev || prev.date.slice(0, 7) !== monthKey);
+            const weekKey = mondayOf(g.date);
+            const showWeek = !showMonth && prev && mondayOf(prev.date) !== weekKey;
+
+            return (
+              <div key={g.date} className="flex flex-col gap-2">
+                {showMonth && (
+                  <div className="mt-3 flex items-baseline justify-between px-1 first:mt-0">
+                    <h2 className="text-sm font-bold tracking-wider text-zinc-700 uppercase dark:text-zinc-200">
+                      {MONTH_NAMES[Number(monthKey.slice(5)) - 1]} {monthKey.slice(0, 4)}
+                    </h2>
+                    <span className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+                      {formatMoney(monthTotals.get(monthKey) ?? 0)}
+                    </span>
+                  </div>
+                )}
+                {showWeek && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
+                    <span className="text-[11px] font-medium whitespace-nowrap text-zinc-400 dark:text-zinc-500">
+                      Week {weekLabel(weekKey)} · {formatMoney(weekTotals.get(weekKey) ?? 0)}
+                    </span>
+                    <span className="h-px flex-1 bg-zinc-300 dark:bg-zinc-700" />
+                  </div>
+                )}
+                <DayCard group={g} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DayCard({ group }: { group: DayGroup }) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-baseline justify-between border-b border-zinc-100 bg-zinc-50 px-3 py-1.5 dark:border-zinc-800 dark:bg-zinc-800/40">
+        <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+          {dayLabel(group.date, todayISO())}
+        </span>
+        <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+          {formatMoney(group.totalCents)}
+        </span>
+      </div>
+      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        {group.items.map((e) => (
+          <ExpenseRowItem key={e.id} expense={e} />
+        ))}
       </div>
     </div>
   );
@@ -176,6 +272,7 @@ function StatTile({ label, value, accent }: { label: string; value: string; acce
 
 function ExpenseRowItem({ expense: e }: { expense: ExpenseRow }) {
   const wo = writeOffCents(e);
+  const time = e.occurred_at.split(' ')[1] ?? '';
   return (
     <Link
       href={`/expenses/${e.id}`}
@@ -202,7 +299,7 @@ function ExpenseRowItem({ expense: e }: { expense: ExpenseRow }) {
           {e.vendor || e.category_name || 'Expense'}
         </p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          <span>{formatDateShort(e.occurred_at)}</span>
+          {time && time !== '00:00' && <span>{time}</span>}
           {e.category_name && (
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: e.category_color ?? '#71717a' }} />

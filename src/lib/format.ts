@@ -43,8 +43,56 @@ export const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+export const WEEKDAY_NAMES = [
+  'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+];
+
 export function formatDateShort(occurredAt: string): string {
   const [date, time] = occurredAt.split(' ');
   const [y, m, d] = date.split('-').map(Number);
   return `${MONTH_NAMES[m - 1].slice(0, 3)} ${d}, ${y}${time && time !== '00:00' ? ` · ${time}` : ''}`;
+}
+
+export function parseDateParts(dateStr: string): { y: number; m: number; d: number } {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return { y, m, d };
+}
+
+/** Monday (ISO week start) of the week containing the given date. */
+export function mondayOf(dateStr: string): string {
+  const { y, m, d } = parseDateParts(dateStr);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+  return localDateISO(dt);
+}
+
+/** "Jul 7" */
+export function shortDate(dateStr: string): string {
+  const { m, d } = parseDateParts(dateStr);
+  return `${MONTH_NAMES[m - 1].slice(0, 3)} ${d}`;
+}
+
+/** Day heading: "Today · Jul 13", "Yesterday · Jul 12", "Tuesday · Jul 8", "Friday · Dec 19, 2025" */
+export function dayLabel(dateStr: string, todayStr: string): string {
+  const { y, m, d } = parseDateParts(dateStr);
+  const yesterday = new Date();
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  yesterday.setFullYear(ty, tm - 1, td - 1);
+
+  let prefix = WEEKDAY_NAMES[new Date(y, m - 1, d).getDay()];
+  if (dateStr === todayStr) prefix = 'Today';
+  else if (dateStr === localDateISO(yesterday)) prefix = 'Yesterday';
+
+  const sameYear = dateStr.slice(0, 4) === todayStr.slice(0, 4);
+  return `${prefix} · ${MONTH_NAMES[m - 1].slice(0, 3)} ${d}${sameYear ? '' : `, ${y}`}`;
+}
+
+/** Week label from its Monday: "Jul 7 – 13" or "Jun 30 – Jul 6" */
+export function weekLabel(mondayStr: string): string {
+  const { y, m, d } = parseDateParts(mondayStr);
+  const sunday = new Date(y, m - 1, d + 6);
+  const sameMonth = sunday.getMonth() === m - 1;
+  return sameMonth
+    ? `${MONTH_NAMES[m - 1].slice(0, 3)} ${d} – ${sunday.getDate()}`
+    : `${MONTH_NAMES[m - 1].slice(0, 3)} ${d} – ${MONTH_NAMES[sunday.getMonth()].slice(0, 3)} ${sunday.getDate()}`;
 }

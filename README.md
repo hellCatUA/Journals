@@ -7,11 +7,14 @@ mark write-offs, group by project and export to CSV.
 ## Features
 
 - **Receipt upload** — phone camera or gallery (separate buttons), drag &
-  drop, or PDF
+  drop, or PDF (first page is rendered for OCR and previews via poppler)
 - **Local OCR** — Tesseract runs inside the container (no cloud, no API keys);
   several preprocessing variants and page-segmentation modes are tried and
   the highest-confidence read wins; detects amount, date, time and vendor,
   everything editable before saving
+- **Grouped timeline** — expenses are grouped into day cards with daily
+  totals, separated by week dividers (with weekly totals) and, in the
+  all-time view, month headers with monthly totals
 - **Category icons** — monochrome Lucide icon set (~2000 icons) with a
   searchable picker in Settings; icons are tinted with the category color
   and shown on the expense list

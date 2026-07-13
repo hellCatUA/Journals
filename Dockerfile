@@ -18,9 +18,10 @@ RUN npm run build
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
-# Tesseract powers the receipt OCR endpoint; curl is for the healthcheck.
+# Tesseract powers the receipt OCR endpoint, poppler-utils (pdftoppm)
+# renders PDF receipts for OCR and previews; curl is for the healthcheck.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng curl \
+    && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng poppler-utils curl \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \

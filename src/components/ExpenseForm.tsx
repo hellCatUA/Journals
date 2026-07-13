@@ -42,6 +42,7 @@ export default function ExpenseForm({ expense }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [pdfPreviewFailed, setPdfPreviewFailed] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -87,6 +88,7 @@ export default function ExpenseForm({ expense }: Props) {
     setFile(f);
     setRemoveReceipt(false);
     setScanMsg(null);
+    setPdfPreviewFailed(false);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(f && f.type.startsWith('image/') ? URL.createObjectURL(f) : null);
   }
@@ -179,10 +181,14 @@ export default function ExpenseForm({ expense }: Props) {
         ? `This category allows partial write-off only (default ${selectedCategory.default_write_off_pct}%).`
         : null;
 
+  const pickedIsPdf =
+    !!file && (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+
   const existingReceiptUrl =
     isEdit && expense!.receipt_path && !removeReceipt && !file
       ? `/api/receipts/${expense!.receipt_path}`
       : null;
+  const existingIsPdf = !!existingReceiptUrl && expense!.receipt_path!.toLowerCase().endsWith('.pdf');
 
   return (
     <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -211,6 +217,20 @@ export default function ExpenseForm({ expense }: Props) {
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={previewUrl} alt="Receipt preview" className="max-h-96 rounded-md object-contain" />
+          ) : pickedIsPdf ? (
+            <PdfPlaceholder label={file!.name} hint="First page will be scanned and stored" />
+          ) : existingReceiptUrl && existingIsPdf ? (
+            pdfPreviewFailed ? (
+              <PdfPlaceholder label={expense!.receipt_path!.split('/').pop() ?? 'receipt.pdf'} hint="Preview unavailable" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`${existingReceiptUrl}?preview=1`}
+                alt="Current receipt (PDF)"
+                className="max-h-96 rounded-md object-contain"
+                onError={() => setPdfPreviewFailed(true)}
+              />
+            )
           ) : existingReceiptUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={existingReceiptUrl} alt="Current receipt" className="max-h-96 rounded-md object-contain" />
@@ -254,11 +274,16 @@ export default function ExpenseForm({ expense }: Props) {
           <button
             type="button"
             className="btn-primary"
-            disabled={!file || !file.type.startsWith('image/') || scanning}
+            disabled={!file || scanning}
             onClick={scanReceipt}
           >
             {scanning ? 'Scanning…' : 'Scan receipt (OCR)'}
           </button>
+          {existingIsPdf && (
+            <a href={existingReceiptUrl!} target="_blank" rel="noreferrer" className="btn-secondary">
+              Open PDF
+            </a>
+          )}
           {(file || existingReceiptUrl) && (
             <button
               type="button"
@@ -429,5 +454,18 @@ export default function ExpenseForm({ expense }: Props) {
         </div>
       </div>
     </form>
+  );
+}
+
+function PdfPlaceholder({ label, hint }: { label: string; hint: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-6">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-red-400">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <p className="max-w-full truncate px-4 text-sm font-medium">{label}</p>
+      <p className="text-xs text-zinc-400 dark:text-zinc-500">PDF · {hint}</p>
+    </div>
   );
 }
