@@ -1,0 +1,18 @@
+services:
+  field-expenses:
+    build: .
+    image: field-expenses:latest
+    container_name: field-expenses
+    restart: unless-stopped
+    ports:
+      # NPM runs in host network mode, so it reaches this app at
+      # http://127.0.0.1:3444 (or http://<OMV-LAN-IP>:3444).
+      - "3444:3000"
+    volumes:
+      # SQLite DB lives in ./data/db, receipt photos in ./data/receipts/YY/MM/DD
+      - ./data:/data
+    environment:
+      - TZ=Europe/Kyiv
+      # Tesseract languages for receipt OCR. Add e.g. "eng+ukr" after
+      # installing tesseract-ocr-ukr in the Dockerfile.
+      - OCR_LANGS=eng
