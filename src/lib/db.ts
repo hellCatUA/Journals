@@ -55,10 +55,20 @@ CREATE TABLE IF NOT EXISTS expense_groups (
   PRIMARY KEY (expense_id, group_id)
 );
 
+CREATE TABLE IF NOT EXISTS attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  path TEXT NOT NULL,
+  original_name TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_expenses_occurred_at ON expenses(occurred_at);
 CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_account ON expenses(account_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_vendor ON expenses(vendor COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_expense_groups_group ON expense_groups(group_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_expense ON attachments(expense_id);
 `;
 
 // Categories tailored to a field IT services business.

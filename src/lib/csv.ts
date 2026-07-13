@@ -26,6 +26,7 @@ export function expensesToCsv(expenses: ExpenseRow[]): string {
     'Groups',
     'Note',
     'Receipt file',
+    'Evidence files',
   ];
 
   const lines = [header.join(',')];
@@ -53,12 +54,13 @@ export function expensesToCsv(expenses: ExpenseRow[]): string {
         csvEscape(e.group_names.join('; ')),
         csvEscape(e.note),
         csvEscape(e.receipt_path ?? ''),
+        csvEscape(e.evidence_paths ?? ''),
       ].join(',')
     );
   }
 
   lines.push(
-    ['TOTAL', '', '', '', '', dollars(totalCents), '', '', dollars(totalWriteOffCents), '', '', ''].join(',')
+    ['TOTAL', '', '', '', '', dollars(totalCents), '', '', dollars(totalWriteOffCents), '', '', '', ''].join(',')
   );
 
   // BOM so Excel opens UTF-8 correctly.

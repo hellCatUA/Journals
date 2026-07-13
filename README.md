@@ -15,6 +15,12 @@ mark write-offs, group by project and export to CSV.
 - **Grouped timeline** — expenses are grouped into day cards with daily
   totals, separated by week dividers (with weekly totals) and, in the
   all-time view, month headers with monthly totals
+- **Supporting evidence** — attach extra photos/PDFs to an expense
+  (invoices, serial numbers, before/after shots); stored in the same
+  `YY/MM/DD` layout and exported alongside the receipt path
+- **Smart vendor field** — suggests previously used vendors as you type
+  (most used first) and auto-fills the vendor's usual category and account;
+  OCR does the same when it recognizes a known vendor
 - **Category icons** — monochrome Lucide icon set (~2000 icons) with a
   searchable picker in Settings; icons are tinted with the category color
   and shown on the expense list

@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Account, Category, ExpenseRow, Group, OcrResult } from '@/lib/types';
+import type { Account, Category, ExpenseDetail, Group, OcrResult, VendorSuggestion } from '@/lib/types';
 import { nowTime, todayISO } from '@/lib/format';
+import VendorAutocomplete from './VendorAutocomplete';
 
 interface Props {
-  expense?: ExpenseRow; // present = edit mode
+  expense?: ExpenseDetail; // present = edit mode
 }
 
 export default function ExpenseForm({ expense }: Props) {
@@ -37,6 +38,12 @@ export default function ExpenseForm({ expense }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Supporting evidence: extra photos/PDFs stored alongside the receipt.
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]); // '' for non-images
+  const [removedAttachmentIds, setRemovedAttachmentIds] = useState<number[]>([]);
+  const evidenceInputRef = useRef<HTMLInputElement>(null);
+
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -64,6 +71,13 @@ export default function ExpenseForm({ expense }: Props) {
     };
   }, [previewUrl]);
 
+  useEffect(() => {
+    return () => {
+      for (const url of evidenceUrls) if (url) URL.revokeObjectURL(url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const selectedCategory = useMemo(
     () => categories.find((c) => String(c.id) === categoryId) ?? null,
     [categories, categoryId]
@@ -82,6 +96,42 @@ export default function ExpenseForm({ expense }: Props) {
   function onCategoryChange(value: string) {
     setCategoryId(value);
     applyCategoryPolicy(categories.find((c) => String(c.id) === value) ?? null);
+  }
+
+  function pickVendor(s: VendorSuggestion) {
+    setVendor(s.vendor);
+    if (s.category_id) onCategoryChange(String(s.category_id));
+    if (s.account_id && !accountId) setAccountId(String(s.account_id));
+  }
+
+  /** If the vendor is already known, prefill category/account from its history. */
+  async function prefillFromVendorHistory(vendorName: string, overrideCategory: boolean) {
+    try {
+      const res = await fetch(`/api/vendors?q=${encodeURIComponent(vendorName)}`);
+      const data: { suggestions: VendorSuggestion[] } = await res.json();
+      const match = data.suggestions.find((s) => s.vendor.toLowerCase() === vendorName.toLowerCase());
+      if (!match) return;
+      if (match.category_id && (overrideCategory || !categoryId)) onCategoryChange(String(match.category_id));
+      if (match.account_id && !accountId) setAccountId(String(match.account_id));
+    } catch {
+      // suggestions are best-effort
+    }
+  }
+
+  function addEvidence(list: FileList | null) {
+    if (!list) return;
+    const files = [...list];
+    setEvidenceFiles((prev) => [...prev, ...files]);
+    setEvidenceUrls((prev) => [
+      ...prev,
+      ...files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : '')),
+    ]);
+  }
+
+  function removePendingEvidence(index: number) {
+    if (evidenceUrls[index]) URL.revokeObjectURL(evidenceUrls[index]);
+    setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
+    setEvidenceUrls((prev) => prev.filter((_, i) => i !== index));
   }
 
   function onPickFile(f: File | null) {
@@ -122,6 +172,8 @@ export default function ExpenseForm({ expense }: Props) {
       if (data.vendor) {
         setVendor(data.vendor);
         found.push(`vendor "${data.vendor}"`);
+        // Known vendor → pull its usual category/account from history.
+        void prefillFromVendorHistory(data.vendor, false);
       }
       setOcrText(data.text);
       setScanMsg(found.length ? `Detected: ${found.join(', ')}. Review before saving.` : 'Text extracted, but no fields recognized — fill in manually.');
@@ -155,6 +207,8 @@ export default function ExpenseForm({ expense }: Props) {
       fd.append('ocr_text', ocrText);
       if (file) fd.append('receipt', file);
       if (removeReceipt) fd.append('remove_receipt', '1');
+      for (const f of evidenceFiles) fd.append('evidence', f);
+      if (removedAttachmentIds.length) fd.append('remove_attachment_ids', removedAttachmentIds.join(','));
 
       const res = await fetch(isEdit ? `/api/expenses/${expense!.id}` : '/api/expenses', {
         method: isEdit ? 'PUT' : 'POST',
@@ -306,6 +360,58 @@ export default function ExpenseForm({ expense }: Props) {
           </p>
         )}
 
+        {/* Supporting evidence */}
+        <div className="flex flex-col gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+          <span className="label mb-0">Supporting evidence</span>
+          <div className="flex flex-wrap gap-2">
+            {(expense?.attachments ?? [])
+              .filter((att) => !removedAttachmentIds.includes(att.id))
+              .map((att) => (
+                <EvidenceThumb
+                  key={`saved-${att.id}`}
+                  src={
+                    att.path.toLowerCase().endsWith('.pdf')
+                      ? `/api/receipts/${att.path}?preview=1`
+                      : `/api/receipts/${att.path}`
+                  }
+                  href={`/api/receipts/${att.path}`}
+                  title={att.original_name || att.path}
+                  onRemove={() => setRemovedAttachmentIds((prev) => [...prev, att.id])}
+                />
+              ))}
+            {evidenceFiles.map((f, i) => (
+              <EvidenceThumb
+                key={`pending-${i}-${f.name}`}
+                src={evidenceUrls[i] || null}
+                title={f.name}
+                onRemove={() => removePendingEvidence(i)}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => evidenceInputRef.current?.click()}
+              title="Add supporting photos or PDFs"
+              className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 text-xl text-zinc-400 transition-colors hover:border-zinc-400 hover:text-zinc-500 dark:border-zinc-700 dark:hover:border-zinc-500"
+            >
+              +
+            </button>
+          </div>
+          <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+            Extra photos or PDFs stored with this expense: invoices, serial numbers, before/after shots.
+          </p>
+          <input
+            ref={evidenceInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              addEvidence(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </div>
+
         {ocrText && (
           <details className="text-xs">
             <summary className="cursor-pointer text-zinc-500 select-none dark:text-zinc-400">
@@ -345,13 +451,10 @@ export default function ExpenseForm({ expense }: Props) {
 
         <div>
           <label className="label" htmlFor="vendor">Vendor / merchant</label>
-          <input
-            id="vendor"
-            className="input"
-            placeholder="e.g. Home Depot"
-            value={vendor}
-            onChange={(e) => setVendor(e.target.value)}
-          />
+          <VendorAutocomplete value={vendor} onChange={setVendor} onPick={pickVendor} />
+          <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
+            Picking a known vendor fills in its usual category automatically.
+          </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -454,6 +557,53 @@ export default function ExpenseForm({ expense }: Props) {
         </div>
       </div>
     </form>
+  );
+}
+
+function EvidenceThumb({
+  src,
+  href,
+  title,
+  onRemove,
+}: {
+  src: string | null;
+  href?: string;
+  title: string;
+  onRemove: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  const inner =
+    src && !failed ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={title} className="h-16 w-16 rounded-lg border border-zinc-200 object-cover dark:border-zinc-700" onError={() => setFailed(true)} />
+    ) : (
+      <span
+        title={title}
+        className="flex h-16 w-16 items-center justify-center rounded-lg border border-zinc-200 text-[10px] font-semibold text-red-400 dark:border-zinc-700"
+      >
+        PDF
+      </span>
+    );
+
+  return (
+    <span className="relative inline-block" title={title}>
+      {href ? (
+        <a href={href} target="_blank" rel="noreferrer">
+          {inner}
+        </a>
+      ) : (
+        inner
+      )}
+      <button
+        type="button"
+        aria-label={`Remove ${title}`}
+        onClick={onRemove}
+        className="absolute -top-1.5 -right-1.5 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-zinc-300 bg-white text-[10px] text-zinc-500 shadow hover:text-red-500 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+      >
+        ✕
+      </button>
+    </span>
   );
 }
 

@@ -2,6 +2,23 @@ import type { ExpenseInput } from './expenses';
 
 export class ValidationError extends Error {}
 
+export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+export const MAX_EVIDENCE_FILES = 10;
+
+/** Collect valid evidence files from a multipart form, enforcing limits. */
+export function evidenceFilesFromForm(form: FormData): File[] {
+  const files = form.getAll('evidence').filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length > MAX_EVIDENCE_FILES) {
+    throw new ValidationError(`Too many evidence files (max ${MAX_EVIDENCE_FILES}).`);
+  }
+  for (const f of files) {
+    if (f.size > MAX_FILE_BYTES) {
+      throw new ValidationError(`Evidence file "${f.name}" is too large (max 25 MB).`);
+    }
+  }
+  return files;
+}
+
 const DATETIME_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
 
 /**

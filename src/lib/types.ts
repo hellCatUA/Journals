@@ -50,6 +50,28 @@ export interface ExpenseRow extends Expense {
   account_name: string | null;
   group_ids: number[];
   group_names: string[];
+  evidence_paths: string | null; // '; '-joined supporting evidence paths
+}
+
+export interface Attachment {
+  id: number;
+  expense_id: number;
+  path: string;
+  original_name: string;
+  created_at: string;
+}
+
+/** Full expense as returned by the single-expense endpoints. */
+export interface ExpenseDetail extends ExpenseRow {
+  attachments: Attachment[];
+}
+
+export interface VendorSuggestion {
+  vendor: string;
+  uses: number;
+  category_id: number | null;
+  category_name: string | null;
+  account_id: number | null;
 }
 
 export interface ExpenseStats {

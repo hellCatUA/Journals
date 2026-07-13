@@ -1,5 +1,5 @@
 import { getDb } from './db';
-import type { Expense, ExpenseRow, ExpenseStats } from './types';
+import type { Attachment, Expense, ExpenseDetail, ExpenseRow, ExpenseStats, VendorSuggestion } from './types';
 import { writeOffCents } from './types';
 
 export interface ExpenseFilters {
@@ -54,7 +54,8 @@ export function listExpenses(filters: ExpenseFilters): { expenses: ExpenseRow[];
     .prepare(
       `SELECT e.*,
               c.name AS category_name, c.color AS category_color, c.icon AS category_icon, c.write_off AS category_write_off,
-              a.name AS account_name
+              a.name AS account_name,
+              (SELECT GROUP_CONCAT(att.path, '; ') FROM attachments att WHERE att.expense_id = e.id) AS evidence_paths
        FROM expenses e
        LEFT JOIN categories c ON c.id = e.category_id
        LEFT JOIN accounts a ON a.id = e.account_id
@@ -81,13 +82,14 @@ export function listExpenses(filters: ExpenseFilters): { expenses: ExpenseRow[];
   return { expenses, stats };
 }
 
-export function getExpense(id: number): ExpenseRow | null {
+export function getExpense(id: number): ExpenseDetail | null {
   const db = getDb();
   const row = db
     .prepare(
       `SELECT e.*,
               c.name AS category_name, c.color AS category_color, c.icon AS category_icon, c.write_off AS category_write_off,
-              a.name AS account_name
+              a.name AS account_name,
+              (SELECT GROUP_CONCAT(att.path, '; ') FROM attachments att WHERE att.expense_id = e.id) AS evidence_paths
        FROM expenses e
        LEFT JOIN categories c ON c.id = e.category_id
        LEFT JOIN accounts a ON a.id = e.account_id
@@ -100,7 +102,12 @@ export function getExpense(id: number): ExpenseRow | null {
     .prepare(`SELECT g.id, g.name FROM expense_groups eg JOIN groups g ON g.id = eg.group_id WHERE eg.expense_id = ? ORDER BY g.name`)
     .all(id) as Array<{ id: number; name: string }>;
 
-  return { ...row, group_ids: groups.map((g) => g.id), group_names: groups.map((g) => g.name) };
+  return {
+    ...row,
+    group_ids: groups.map((g) => g.id),
+    group_names: groups.map((g) => g.name),
+    attachments: getAttachments(id),
+  };
 }
 
 export interface ExpenseInput {
@@ -173,10 +180,96 @@ function setGroups(expenseId: number, groupIds: number[]): void {
   for (const gid of groupIds) ins.run(expenseId, gid);
 }
 
-export function deleteExpense(id: number): Expense | null {
+export function deleteExpense(id: number): { expense: Expense; attachment_paths: string[] } | null {
   const db = getDb();
   const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id) as Expense | undefined;
   if (!existing) return null;
+  const attachmentPaths = (
+    db.prepare('SELECT path FROM attachments WHERE expense_id = ?').all(id) as Array<{ path: string }>
+  ).map((a) => a.path);
   db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
-  return existing;
+  return { expense: existing, attachment_paths: attachmentPaths };
+}
+
+/* ---------------- Supporting evidence attachments ---------------- */
+
+export function getAttachments(expenseId: number): Attachment[] {
+  return getDb()
+    .prepare('SELECT * FROM attachments WHERE expense_id = ? ORDER BY id')
+    .all(expenseId) as Attachment[];
+}
+
+export function addAttachment(expenseId: number, path: string, originalName: string): Attachment {
+  const db = getDb();
+  const result = db
+    .prepare('INSERT INTO attachments (expense_id, path, original_name) VALUES (?, ?, ?)')
+    .run(expenseId, path, originalName.slice(0, 200));
+  return db.prepare('SELECT * FROM attachments WHERE id = ?').get(result.lastInsertRowid) as Attachment;
+}
+
+/** Remove attachment rows belonging to the expense; returns the file paths that were removed. */
+export function removeAttachments(expenseId: number, ids: number[]): string[] {
+  if (ids.length === 0) return [];
+  const db = getDb();
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT id, path FROM attachments WHERE expense_id = ? AND id IN (${placeholders})`)
+    .all(expenseId, ...ids) as Array<{ id: number; path: string }>;
+  db.prepare(`DELETE FROM attachments WHERE expense_id = ? AND id IN (${placeholders})`).run(expenseId, ...ids);
+  return rows.map((r) => r.path);
+}
+
+export function updateAttachmentPath(id: number, path: string): void {
+  getDb().prepare('UPDATE attachments SET path = ? WHERE id = ?').run(path, id);
+}
+
+/* ---------------- Vendor suggestions ---------------- */
+
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/**
+ * Suggest vendors from expense history, most-used first (prefix matches
+ * ranked above substring matches). Each suggestion carries the vendor's
+ * most frequent category and account so the form can prefill them.
+ */
+export function suggestVendors(q: string, limit = 8): VendorSuggestion[] {
+  const db = getDb();
+  const escaped = escapeLike(q.trim());
+
+  const rows = db
+    .prepare(
+      `SELECT vendor, COUNT(*) AS uses, MAX(occurred_at) AS last_used
+       FROM expenses
+       WHERE vendor <> '' AND vendor LIKE :pattern ESCAPE '\\'
+       GROUP BY vendor COLLATE NOCASE
+       ORDER BY (CASE WHEN vendor LIKE :prefix ESCAPE '\\' THEN 0 ELSE 1 END), uses DESC, last_used DESC
+       LIMIT :limit`
+    )
+    .all({ pattern: `%${escaped}%`, prefix: `${escaped}%`, limit }) as Array<{ vendor: string; uses: number }>;
+
+  const topCategory = db.prepare(
+    `SELECT e.category_id AS id, c.name AS name
+     FROM expenses e JOIN categories c ON c.id = e.category_id
+     WHERE e.vendor = ? COLLATE NOCASE AND e.category_id IS NOT NULL
+     GROUP BY e.category_id ORDER BY COUNT(*) DESC, MAX(e.occurred_at) DESC LIMIT 1`
+  );
+  const topAccount = db.prepare(
+    `SELECT account_id AS id FROM expenses
+     WHERE vendor = ? COLLATE NOCASE AND account_id IS NOT NULL
+     GROUP BY account_id ORDER BY COUNT(*) DESC, MAX(occurred_at) DESC LIMIT 1`
+  );
+
+  return rows.map((r) => {
+    const cat = topCategory.get(r.vendor) as { id: number; name: string } | undefined;
+    const acc = topAccount.get(r.vendor) as { id: number } | undefined;
+    return {
+      vendor: r.vendor,
+      uses: r.uses,
+      category_id: cat?.id ?? null,
+      category_name: cat?.name ?? null,
+      account_id: acc?.id ?? null,
+    };
+  });
 }

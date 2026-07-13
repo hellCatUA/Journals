@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createExpense, listExpenses, type ExpenseFilters } from '@/lib/expenses';
+import { addAttachment, createExpense, listExpenses, type ExpenseFilters } from '@/lib/expenses';
 import { saveReceipt } from '@/lib/receipts';
-import { expenseInputFromForm, ValidationError } from '@/lib/validate';
+import { evidenceFilesFromForm, expenseInputFromForm, MAX_FILE_BYTES, ValidationError } from '@/lib/validate';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,16 +23,21 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
     const input = expenseInputFromForm(form);
+    const evidence = evidenceFilesFromForm(form);
 
     const receipt = form.get('receipt');
     if (receipt instanceof File && receipt.size > 0) {
-      if (receipt.size > 25 * 1024 * 1024) {
+      if (receipt.size > MAX_FILE_BYTES) {
         return NextResponse.json({ error: 'Receipt file too large (max 25 MB).' }, { status: 400 });
       }
       input.receipt_path = await saveReceipt(receipt, input.occurred_at);
     }
 
     const expense = createExpense(input);
+    for (const f of evidence) {
+      const path = await saveReceipt(f, input.occurred_at);
+      addAttachment(expense.id, path, f.name);
+    }
     return NextResponse.json({ expense }, { status: 201 });
   } catch (err) {
     if (err instanceof ValidationError) {
