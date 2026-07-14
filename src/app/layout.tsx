@@ -3,8 +3,8 @@ import './globals.css';
 import Nav from '@/components/Nav';
 
 export const metadata: Metadata = {
-  title: 'Field Expenses',
-  description: 'Business expense tracker with receipt OCR',
+  title: 'Journals',
+  description: 'Self-hosted business expense journal with receipt OCR',
 };
 
 export const viewport: Viewport = {

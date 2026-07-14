@@ -4,7 +4,7 @@ import DeleteExpenseButton from '@/components/DeleteExpenseButton';
 import { getExpense } from '@/lib/expenses';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Edit expense · Field Expenses' };
+export const metadata = { title: 'Edit expense · Journals' };
 
 export default async function EditExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const id = Number.parseInt((await params).id, 10);

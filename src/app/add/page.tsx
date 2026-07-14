@@ -1,6 +1,6 @@
 import ExpenseForm from '@/components/ExpenseForm';
 
-export const metadata = { title: 'Add expense · Field Expenses' };
+export const metadata = { title: 'Add expense · Journals' };
 
 export default function AddExpensePage() {
   return (

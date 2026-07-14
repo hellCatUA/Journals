@@ -1,8 +1,8 @@
 {
-  "name": "field-expenses",
+  "name": "journals",
   "version": "1.0.0",
   "private": true,
-  "description": "Self-hosted business expense tracker with receipt OCR for field IT services",
+  "description": "Journals — self-hosted business expense journal with receipt OCR for field IT services",
   "scripts": {
     "predev": "node scripts/copy-icons.mjs",
     "dev": "next dev",

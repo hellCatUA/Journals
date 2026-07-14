@@ -1,6 +1,6 @@
-# Field Expenses
+# Journals
 
-Self-hosted business expense tracker for a field IT services business.
+Self-hosted business expense journal for a field IT services business.
 Upload receipt photos, scan them with local OCR (Tesseract), categorize,
 mark write-offs, group by project and export to CSV.
 
@@ -42,10 +42,17 @@ mark write-offs, group by project and export to CSV.
 ## Quick start (Docker Compose on OMV)
 
 ```bash
-git clone <this repo> field-expenses
-cd field-expenses
+git clone <this repo> journals
+cd journals
 docker compose up -d --build
 ```
+
+> **Upgrading from the "field-expenses" days?** The compose service,
+> image and container are now named `journals`. Before pulling this
+> version run `docker compose down` (or `docker rm -f field-expenses`)
+> so the old container releases port 3444, then
+> `git pull && docker compose up -d --build`. The `./data` folder is
+> untouched — nothing to migrate.
 
 The app listens on **port 3444** on the host (change it in
 `docker-compose.yml` if taken). All data lives in `./data`:

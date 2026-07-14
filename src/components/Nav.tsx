@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import CategoryIcon from './CategoryIcon';
 import ThemeToggle from './ThemeToggle';
 
 const LINKS = [
@@ -22,10 +23,10 @@ export default function Nav() {
     <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
       <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-4 py-3">
         <Link href="/" className="mr-2 flex items-center gap-2 font-semibold whitespace-nowrap">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-sm text-white">
-            F
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 dark:bg-zinc-100">
+            <CategoryIcon icon="notebook-text" color="currentColor" size={16} className="text-white dark:text-zinc-900" />
           </span>
-          <span className="hidden sm:inline">Field Expenses</span>
+          <span className="hidden sm:inline">Journals</span>
         </Link>
 
         <nav className="flex flex-1 items-center gap-1 overflow-x-auto">

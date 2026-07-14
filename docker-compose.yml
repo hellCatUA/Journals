@@ -1,8 +1,8 @@
 services:
-  field-expenses:
+  journals:
     build: .
-    image: field-expenses:latest
-    container_name: field-expenses
+    image: journals:latest
+    container_name: journals
     restart: unless-stopped
     ports:
       # NPM runs in host network mode, so it reaches this app at
