@@ -5,6 +5,9 @@ import Nav from '@/components/Nav';
 export const metadata: Metadata = {
   title: 'Journals',
   description: 'Self-hosted business expense journal with receipt OCR',
+  appleWebApp: {
+    title: 'Journals',
+  },
 };
 
 export const viewport: Viewport = {

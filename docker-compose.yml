@@ -12,7 +12,7 @@ services:
       # SQLite DB lives in ./data/db, receipt photos in ./data/receipts/YY/MM/DD
       - ./data:/data
     environment:
-      - TZ=Europe/Kyiv
+      - TZ=America/Los_Angeles
       # Tesseract languages for receipt OCR. Add e.g. "eng+ukr" after
       # installing tesseract-ocr-ukr in the Dockerfile.
       - OCR_LANGS=eng
