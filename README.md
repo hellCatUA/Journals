@@ -54,8 +54,21 @@ docker compose up -d --build
 > `git pull && docker compose up -d --build`. The `./data` folder is
 > untouched — nothing to migrate.
 
-The app listens on **port 3444** on the host (change it in
-`docker-compose.yml` if taken). All data lives in `./data`:
+The app listens on **port 3444** on the host. To customize the port,
+timezone or volumes, don't edit `docker-compose.yml` — create a
+`docker-compose.override.yml` next to it (gitignored, merged
+automatically by compose), e.g.:
+
+```yaml
+services:
+  journals:
+    ports: !override
+      - "8080:3000"
+    environment:
+      - TZ=Europe/Kyiv
+```
+
+All data lives in `./data`:
 
 ```
 data/
